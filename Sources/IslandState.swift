@@ -45,7 +45,14 @@ final class IslandState: ObservableObject {
     var idleSize: CGSize { CGSize(width: idleW, height: idleH) }
     var compactSize: CGSize { CGSize(width: compactW, height: compactH) }
     var expandedSize: CGSize { CGSize(width: expandedW, height: expandedH) }
-    var notificationSize: CGSize { expandedSize } // events pop as the full card
+    /// Track pops use the full card; HUDs (volume…) are slim bars; system
+    /// events use a short card — Alcove-style proportions.
+    var notificationSize: CGSize {
+        guard let n = activeNotification else { return expandedSize }
+        if n.level != nil { return CGSize(width: max(expandedW, 300), height: 72) }
+        if n.isTrack { return expandedSize }
+        return CGSize(width: max(expandedW, 300), height: 100)
+    }
 
     var currentSize: CGSize {
         switch mode {
@@ -69,7 +76,7 @@ final class IslandState: ObservableObject {
         topOffset = 0; xOffset = 6
         idleW = 183; idleH = 31
         compactW = 218; compactH = 27
-        expandedW = 296; expandedH = 210
+        expandedW = 340; expandedH = 164
     }
 
     init() {
@@ -79,8 +86,12 @@ final class IslandState: ObservableObject {
         idleH = Self.load("idleH", 31)
         compactW = Self.load("compactW", 218)
         compactH = Self.load("compactH", 27)
-        expandedW = Self.load("expandedW", 296)
-        expandedH = Self.load("expandedH", 210)
+        expandedW = Self.load("expandedW", 340)
+        expandedH = Self.load("expandedH", 164)
+        // migrate users of the old default card size to the Alcove proportions
+        if expandedW == 296 && expandedH == 210 {
+            expandedW = 340; expandedH = 164
+        }
     }
 
     private var timer: Timer?
@@ -201,7 +212,7 @@ final class IslandState: ObservableObject {
         let pct = Int((v * 100).rounded())
         notify(icon: v == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill",
                title: "Volume", subtitle: "\(pct)%",
-               duration: 2.0, level: Double(v))
+               duration: 1.5, level: Double(v))
     }
 
     func start() {
