@@ -103,3 +103,12 @@ DynamicIsland/
   App Store eligible, and could change in a future macOS update.
 - Artwork for non-YouTube browser players may fall back to the placeholder —
   browsers expose artwork dimensions but not image bytes.
+
+## Author
+
+**Ahmed Hany (EngOREOO)**
+
+- GitHub: [@EngOREOO](https://github.com/EngOREOO)
+- LinkedIn: [codebyoreoo](https://www.linkedin.com/in/codebyoreoo/)
+- Facebook: [hanyohnana](https://web.facebook.com/hanyohnana)
+- Email: [ahmed.hany.off@gmail.com](mailto:ahmed.hany.off@gmail.com)
