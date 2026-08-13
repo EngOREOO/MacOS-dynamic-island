@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import IOKit.ps
 
 // MARK: - State
@@ -17,11 +18,22 @@ final class IslandState: ObservableObject {
     @Published var time: Date = Date()
     @Published var hovering = false
 
+    // MARK: user-adjustable geometry (persisted)
+
+    @Published var topOffset: Double { didSet { save("topOffset", topOffset) } }
+    @Published var xOffset: Double { didSet { save("xOffset", xOffset) } }
+    @Published var idleW: Double { didSet { save("idleW", idleW) } }
+    @Published var idleH: Double { didSet { save("idleH", idleH) } }
+    @Published var compactW: Double { didSet { save("compactW", compactW) } }
+    @Published var compactH: Double { didSet { save("compactH", compactH) } }
+    @Published var expandedW: Double { didSet { save("expandedW", expandedW) } }
+    @Published var expandedH: Double { didSet { save("expandedH", expandedH) } }
+
     // island geometry (shared with the window for hit-testing)
-    let idleSize = CGSize(width: 190, height: 30)
-    let compactSize = CGSize(width: 300, height: 34)
-    let expandedSize = CGSize(width: 360, height: 172)
-    let notificationSize = CGSize(width: 340, height: 84)
+    var idleSize: CGSize { CGSize(width: idleW, height: idleH) }
+    var compactSize: CGSize { CGSize(width: compactW, height: compactH) }
+    var expandedSize: CGSize { CGSize(width: expandedW, height: expandedH) }
+    var notificationSize: CGSize { CGSize(width: min(expandedW, 340), height: 84) }
 
     var currentSize: CGSize {
         switch mode {
@@ -30,6 +42,33 @@ final class IslandState: ObservableObject {
         case .expanded: return expandedSize
         case .notification: return notificationSize
         }
+    }
+
+    private func save(_ key: String, _ value: Double) {
+        UserDefaults.standard.set(value, forKey: "island." + key)
+    }
+
+    private static func load(_ key: String, _ fallback: Double) -> Double {
+        let v = UserDefaults.standard.double(forKey: "island." + key)
+        return v == 0 ? fallback : v
+    }
+
+    func resetGeometry() {
+        topOffset = 13; xOffset = 0
+        idleW = 190; idleH = 30
+        compactW = 300; compactH = 34
+        expandedW = 360; expandedH = 172
+    }
+
+    init() {
+        topOffset = Self.load("topOffset", 13)
+        xOffset = Self.load("xOffset", 0)
+        idleW = Self.load("idleW", 190)
+        idleH = Self.load("idleH", 30)
+        compactW = Self.load("compactW", 300)
+        compactH = Self.load("compactH", 34)
+        expandedW = Self.load("expandedW", 360)
+        expandedH = Self.load("expandedH", 172)
     }
 
     private var timer: Timer?
@@ -85,6 +124,31 @@ final class IslandState: ObservableObject {
         } else {
             mode = track != nil ? .compact : .idle
         }
+    }
+
+    // MARK: settings window
+
+    private var settingsWindow: NSWindow?
+
+    func openSettings() {
+        if let w = settingsWindow {
+            w.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 470),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        w.title = "Dynamic Island Settings"
+        w.contentView = NSHostingView(rootView: SettingsView(state: self))
+        w.center()
+        w.isReleasedWhenClosed = false
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow = w
     }
 
     // MARK: controls
