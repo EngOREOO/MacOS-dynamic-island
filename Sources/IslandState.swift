@@ -58,7 +58,10 @@ final class IslandState: ObservableObject {
         switch mode {
         case .idle: return idleSize
         case .compact: return compactSize
-        case .expanded: return expandedSize
+        case .expanded:
+            // no dead space: without a seekable track the card hugs its content
+            let hasSeek = (track?.duration ?? 0) > 0
+            return CGSize(width: expandedW, height: hasSeek ? expandedH : min(expandedH, 112))
         case .notification: return notificationSize
         }
     }
