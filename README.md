@@ -1,9 +1,10 @@
 # MacOS Dynamic Island
 
-A Dynamic Island for your MacBook notch — just like the iPhone. A slim black pill
-that lives at the top-center of your screen, shows what's playing, pops up
-notifications when the track changes, and expands on hover with full media
-controls and a seekable progress bar.
+A Dynamic Island for your MacBook notch — just like the iPhone. A black island
+that hangs flush from the top edge of your screen (square top corners, rounded
+bottom corners — a true extension of the notch, Alcove-style), shows what's
+playing, pops up notifications when the track changes, and expands on hover
+with full media controls and a seekable progress bar.
 
 ![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-black)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
@@ -11,6 +12,8 @@ controls and a seekable progress bar.
 
 ## Features
 
+- **Notch-flush design** — square top corners melt into the notch/menu bar,
+  rounded bottom corners; the island looks like part of the hardware
 - **Idle pill** — clock + battery, sits quietly at the top of the screen
 - **Now Playing pill** — artwork, track title, and a live animated waveform
   while anything plays (freezes on pause)
@@ -24,12 +27,13 @@ controls and a seekable progress bar.
     estimates when macOS provides them
   - 🪫 **Low battery** warning at 20% (red)
   - 🔒 **Screen locked** / **unlocked** (blue)
-  - 🔊 **Volume HUD** — the instant you press a volume key: speaker icon,
-    percentage, and a level bar (native CoreAudio listener, no polling)
+  - 🔊 **Volume HUD** — the instant you press a volume key: a slim bar with a
+    speaker icon and a thick **glow level bar** (green → orange → red as the
+    level climbs), 1.5s glance. Native CoreAudio listener, no polling
   Multiple events queue up and show one at a time, ~4s each (HUDs ~2s)
-- **Hover to expand** — full card with artwork, title, artist, source-app badge,
-  previous / play-pause / next, and a **seek bar you can drag** to scrub
-  through the song or video
+- **Hover to expand** — Alcove-style player card: artwork, title + artist,
+  live waveform, elapsed / **-remaining** times, a **seek bar you can drag**,
+  and transport controls with settings + quit tucked into the corners
 - **Works with everything** — YouTube in Brave/Chrome/Safari/Arc/Edge/Firefox,
   Apple Music, Spotify, QuickTime… anything macOS Now Playing sees
 - **YouTube thumbnails** — browser playback doesn't ship artwork to macOS, so the
