@@ -14,12 +14,15 @@ controls and a seekable progress bar.
 - **Idle pill** — clock + battery, sits quietly at the top of the screen
 - **Now Playing pill** — artwork, track title, and a live animated waveform
   while anything plays (freezes on pause)
-- **Track-change pop** — the island expands by itself for ~4 seconds when a new
-  track starts, then shrinks back (iPhone-style)
-- **Notification hub** — queued pop-ups for system events, rendered iPhone-style:
-  - 🔌 **Charger connected / removed** (with battery %)
-  - 🪫 **Low battery** warning at 20%
-  - 🔒 **Screen locked** / **unlocked**
+- **Track-change pop** — the island pops open for a 1-second glance when a new
+  track starts, then tucks itself away (iPhone-style)
+- **Notification hub** — queued pop-ups for system events, rendered iPhone-style
+  with color-coded icons:
+  - 🔌 **Charger connected** (green) / **removed** (orange), instantly — the app
+    listens for IOKit power-source events, so the pop fires the moment you
+    plug or unplug, no polling delay
+  - 🪫 **Low battery** warning at 20% (red)
+  - 🔒 **Screen locked** / **unlocked** (blue)
   Multiple events queue up and show one at a time, ~4s each
 - **Hover to expand** — full card with artwork, title, artist, source-app badge,
   previous / play-pause / next, and a **seek bar you can drag** to scrub
@@ -68,7 +71,7 @@ macOS will ask once for each of these — approve them:
 |---|---|
 | Do nothing | Slim pill: time + battery (or track + waveform while playing) |
 | Play media anywhere | Pill grows with artwork + title + live waveform |
-| Track changes | Island pops open ~4s with "Now Playing", then collapses |
+| Track changes | Island pops open for 1s with "Now Playing", then collapses |
 | Hover the island | Full controls: prev / play / next, seek slider, source badge |
 | Drag the seek bar | Scrubs the playing song/video |
 | Click the gear icon | Opens Settings — adjust position and every island size live |
