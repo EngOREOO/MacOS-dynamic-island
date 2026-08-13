@@ -54,21 +54,21 @@ final class IslandState: ObservableObject {
     }
 
     func resetGeometry() {
-        topOffset = 13; xOffset = 0
-        idleW = 190; idleH = 30
-        compactW = 300; compactH = 34
-        expandedW = 360; expandedH = 172
+        topOffset = 0; xOffset = 6
+        idleW = 183; idleH = 31
+        compactW = 218; compactH = 27
+        expandedW = 296; expandedH = 210
     }
 
     init() {
-        topOffset = Self.load("topOffset", 13)
-        xOffset = Self.load("xOffset", 0)
-        idleW = Self.load("idleW", 190)
-        idleH = Self.load("idleH", 30)
-        compactW = Self.load("compactW", 300)
-        compactH = Self.load("compactH", 34)
-        expandedW = Self.load("expandedW", 360)
-        expandedH = Self.load("expandedH", 172)
+        topOffset = Self.load("topOffset", 0)
+        xOffset = Self.load("xOffset", 6)
+        idleW = Self.load("idleW", 183)
+        idleH = Self.load("idleH", 31)
+        compactW = Self.load("compactW", 218)
+        compactH = Self.load("compactH", 27)
+        expandedW = Self.load("expandedW", 296)
+        expandedH = Self.load("expandedH", 210)
     }
 
     private var timer: Timer?
