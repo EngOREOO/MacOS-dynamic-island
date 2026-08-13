@@ -66,7 +66,24 @@ macOS will ask once for each of these — approve them:
 | Track changes | Island pops open ~4s with "Now Playing", then collapses |
 | Hover the island | Full controls: prev / play / next, seek slider, source badge |
 | Drag the seek bar | Scrubs the playing song/video |
+| Click the gear icon | Opens Settings — adjust position and every island size live |
 | Click the power icon | Quits the app |
+
+## Settings (gear icon)
+
+Hover the island and click the **gear** in the bottom corner of the expanded
+card. Everything applies **live** while you drag and is **saved automatically**
+(it survives restarts):
+
+- **Position** — *Distance from top* (0–60px) and *Horizontal shift*
+  (±300px from screen center)
+- **Idle pill** — width and height of the clock/battery pill
+- **Now Playing pill** — width and height of the playing-track pill
+- **Expanded card** — width and height of the hover card
+- **Reset to defaults** — restores the shipped layout
+
+Defaults: top `0px`, horizontal `+6px`, idle `183×31`, Now Playing `218×27`,
+expanded `296×210`.
 
 ## How it works
 
