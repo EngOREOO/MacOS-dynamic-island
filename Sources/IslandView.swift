@@ -110,25 +110,40 @@ struct IslandView: View {
         .frame(height: state.compactSize.height)
     }
 
-    // MARK: notification pop — track changed
+    // MARK: notification pop — track change or system event
 
     private var notificationContent: some View {
-        HStack(spacing: 12) {
-            artworkView(size: 52)
+        let n = state.activeNotification
+        let isTrack = n?.isTrack ?? true
+        return HStack(spacing: 12) {
+            if isTrack {
+                artworkView(size: 52)
+            } else {
+                Image(systemName: n?.icon ?? "bell.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white.opacity(0.9))
+                    .frame(width: 52, height: 52)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.12))
+                    )
+            }
             VStack(alignment: .leading, spacing: 3) {
-                Text("Now Playing")
+                Text(isTrack ? "Now Playing" : "Notification")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.secondary)
-                Text(state.track?.title ?? "")
+                Text(n?.title ?? state.track?.title ?? "")
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                Text(state.track?.artist ?? "")
+                Text(n?.subtitle ?? state.track?.artist ?? "")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
             Spacer()
-            WaveformView(active: state.track?.isPlaying ?? false)
+            if isTrack {
+                WaveformView(active: state.track?.isPlaying ?? false)
+            }
         }
         .foregroundColor(.white)
         .padding(.horizontal, 16)
