@@ -16,6 +16,11 @@ controls and a seekable progress bar.
   while anything plays (freezes on pause)
 - **Track-change pop** — the island expands by itself for ~4 seconds when a new
   track starts, then shrinks back (iPhone-style)
+- **Notification hub** — queued pop-ups for system events, rendered iPhone-style:
+  - 🔌 **Charger connected / removed** (with battery %)
+  - 🪫 **Low battery** warning at 20%
+  - 🔒 **Screen locked** / **unlocked**
+  Multiple events queue up and show one at a time, ~4s each
 - **Hover to expand** — full card with artwork, title, artist, source-app badge,
   previous / play-pause / next, and a **seek bar you can drag** to scrub
   through the song or video
