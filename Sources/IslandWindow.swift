@@ -1,10 +1,12 @@
 import SwiftUI
 import AppKit
+import Combine
 
 // MARK: - Window
 
 final class IslandWindow: NSPanel {
     private let state = IslandState()
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         super.init(
@@ -28,13 +30,22 @@ final class IslandWindow: NSPanel {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+        // Reposition/resize the panel whenever the user drags a settings slider.
+        state.objectWillChange
+            .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
+            .sink { [weak self] in self?.positionOnScreen() }
+            .store(in: &cancellables)
         startMouseMonitor()
     }
 
     @objc private func positionOnScreen() {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let frame = screen.frame
-        let size = CGSize(width: 440, height: 210)
+        // Panel must fit the largest island state plus the top offset.
+        let size = CGSize(
+            width: max(state.expandedW, state.notificationSize.width, state.compactW, 440) + 80,
+            height: state.topOffset + state.expandedH + 16
+        )
         let origin = CGPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height)
         setFrame(NSRect(origin: origin, size: size), display: true)
     }
@@ -59,9 +70,8 @@ final class IslandWindow: NSPanel {
 
     private func islandScreenFrame() -> NSRect {
         let size = state.currentSize
-        // island is top-centered in the panel, 3px below the panel's top edge
-        let x = frame.midX - size.width / 2
-        let y = frame.maxY - 13 - size.height
+        let x = frame.midX - size.width / 2 + state.xOffset
+        let y = frame.maxY - state.topOffset - size.height
         return NSRect(x: x, y: y, width: size.width, height: size.height)
     }
 }
