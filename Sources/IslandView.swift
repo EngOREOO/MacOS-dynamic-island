@@ -1,18 +1,42 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Island shape
+// Flush with the top edge of the screen: square top corners, rounded bottom
+// corners — the island reads as a physical extension of the notch.
+
+struct IslandShape: Shape {
+    var bottomRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let r = min(bottomRadius, rect.height / 2, rect.width / 2)
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        p.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r), radius: r,
+                 startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        p.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        p.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r), radius: r,
+                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
 // MARK: - Waveform
 
 struct WaveformView: View {
     var active: Bool
     var barCount: Int = 4
+    var color: Color = .green
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.25, paused: !active)) { context in
             HStack(spacing: 2) {
                 ForEach(0..<barCount, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 1)
-                        .fill(Color.green)
+                        .fill(color)
                         .frame(width: 2.5, height: barHeight(index: i, at: context.date))
                 }
             }
@@ -53,10 +77,14 @@ struct IslandView: View {
 
     private var currentSize: CGSize { state.currentSize }
 
-    private var cornerRadius: CGFloat {
+    private var bottomRadius: CGFloat {
         switch state.mode {
-        case .idle, .compact: return currentSize.height / 2
-        case .expanded, .notification: return 26
+        case .idle, .compact:
+            return currentSize.height / 2
+        case .expanded:
+            return 20
+        case .notification:
+            return state.activeNotification?.level != nil ? currentSize.height / 2 : 22
         }
     }
 
@@ -64,14 +92,14 @@ struct IslandView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            IslandShape(bottomRadius: bottomRadius)
                 .fill(Color.black)
                 .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
             content
-                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                .clipShape(IslandShape(bottomRadius: bottomRadius))
         }
         .frame(width: currentSize.width, height: currentSize.height, alignment: .top)
-        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .contentShape(IslandShape(bottomRadius: bottomRadius))
         .onHover { inside in
             withAnimation(morphSpring) {
                 state.setHovering(inside)
@@ -139,7 +167,7 @@ struct IslandView: View {
         .frame(height: state.compactSize.height)
     }
 
-    // MARK: notification card — auto-shows on events, styled like the hover card
+    // MARK: notification — track glance / HUD / system event card
 
     @ViewBuilder
     private var notificationContent: some View {
@@ -147,68 +175,77 @@ struct IslandView: View {
         if n?.isTrack ?? true {
             // track change: full media card, same as hover
             expandedContent
+        } else if let level = n?.level {
+            hudContent(icon: n?.icon ?? "speaker.wave.2.fill", level: level)
         } else {
-            // system event card (charger, battery, lock…)
-            VStack(spacing: 9) {
-                HStack(spacing: 12) {
-                    Image(systemName: n?.icon ?? "bell.fill")
-                        .font(.system(size: 26))
-                        .foregroundColor(n?.accent ?? .white)
-                        .frame(width: 48, height: 48)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill((n?.accent ?? .white).opacity(0.15))
-                        )
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(n?.title ?? "")
-                            .font(.system(size: 14, weight: .semibold))
-                            .lineLimit(1)
-                        Text(n?.subtitle ?? "")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                        if let level = n?.level {
-                            // HUD bar (volume / brightness) — Alcove style
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.white.opacity(0.15))
-                                    Capsule()
-                                        .fill(n?.accent ?? .white)
-                                        .frame(width: max(6, geo.size.width * CGFloat(level)))
-                                }
-                            }
-                            .frame(height: 5)
-                            .padding(.top, 2)
-                        } else {
-                            Text("Notification")
-                                .font(.system(size: 9, weight: .bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.white.opacity(0.12)))
-                        }
-                    }
-                    Spacer()
-                }
-                Spacer()
-                HStack {
-                    Text(state.time, style: .time)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                    BatteryLabel(state: state)
-                    Spacer()
-                }
-                .foregroundColor(.white.opacity(0.7))
-            }
-            .padding(14)
-            .frame(width: state.expandedSize.width, height: state.expandedSize.height, alignment: .top)
+            eventCard(n)
         }
     }
 
-    // MARK: expanded — full media controls
+    // MARK: HUD — icon + thick glow level bar, nothing else (Alcove style)
+
+    private func hudContent(icon: String, level: Double) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(.white)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.18))
+                    Capsule()
+                        .fill(Self.glowColor(level))
+                        .frame(width: max(8, geo.size.width * CGFloat(level)))
+                }
+            }
+            .frame(height: 12)
+        }
+        .padding(.horizontal, 22)
+        .frame(width: state.notificationSize.width, height: state.notificationSize.height)
+    }
+
+    /// Glow theme: green at low levels, shading through orange to red at 100%.
+    private static func glowColor(_ level: Double) -> Color {
+        Color(hue: (1 - min(max(level, 0), 1)) * 0.33, saturation: 0.85, brightness: 0.95)
+    }
+
+    // MARK: system event card — icon tile + title + subtitle
+
+    private func eventCard(_ n: IslandNotification?) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: n?.icon ?? "bell.fill")
+                .font(.system(size: 22))
+                .foregroundColor(n?.accent ?? .white)
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill((n?.accent ?? .white).opacity(0.15))
+                )
+            VStack(alignment: .leading, spacing: 3) {
+                Text(n?.title ?? "")
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Text(n?.subtitle ?? "")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                Text("Notification")
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.white.opacity(0.12)))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .frame(width: state.notificationSize.width, height: state.notificationSize.height)
+    }
+
+    // MARK: expanded — Alcove-style now playing card
 
     private var expandedContent: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: 0) {
             HStack(spacing: 12) {
-                artworkView(size: 48)
+                artworkView(size: 52)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(state.track?.title ?? "Nothing playing")
                         .font(.system(size: 14, weight: .semibold))
@@ -217,58 +254,55 @@ struct IslandView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
-                    if let track = state.track, !track.sourceApp.isEmpty {
-                        Text(track.sourceApp)
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.white.opacity(0.12)))
-                    }
                 }
                 Spacer()
+                if state.track != nil {
+                    WaveformView(active: state.track?.isPlaying ?? false,
+                                 color: .white.opacity(0.9))
+                }
             }
 
-            HStack(spacing: 28) {
-                Button { state.prev() } label: {
-                    Image(systemName: "backward.fill").font(.system(size: 16))
-                }
-                Button { state.togglePlay() } label: {
-                    Image(systemName: (state.track?.isPlaying ?? false) ? "pause.fill" : "play.fill")
-                        .font(.system(size: 20))
-                }
-                Button { state.next() } label: {
-                    Image(systemName: "forward.fill").font(.system(size: 16))
-                }
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(state.track == nil ? .gray : .white)
-            .disabled(state.track == nil)
+            Spacer(minLength: 8)
 
             if let track = state.track, track.duration > 0 {
                 SeekBarView(track: track, onSeek: { state.seek(to: $0) })
+                Spacer(minLength: 8)
             }
 
             HStack {
-                Text(state.time, style: .time)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                BatteryLabel(state: state)
-                Spacer()
                 Button { state.openSettings() } label: {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.55))
                 }
                 .buttonStyle(.plain)
+                Spacer()
+                HStack(spacing: 34) {
+                    Button { state.prev() } label: {
+                        Image(systemName: "backward.fill").font(.system(size: 18))
+                    }
+                    Button { state.togglePlay() } label: {
+                        Image(systemName: (state.track?.isPlaying ?? false) ? "pause.fill" : "play.fill")
+                            .font(.system(size: 22))
+                    }
+                    Button { state.next() } label: {
+                        Image(systemName: "forward.fill").font(.system(size: 18))
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(state.track == nil ? .gray : .white)
+                Spacer()
                 Button { NSApp.terminate(nil) } label: {
                     Image(systemName: "power")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.55))
                 }
                 .buttonStyle(.plain)
             }
-            .foregroundColor(.white.opacity(0.7))
         }
-        .padding(14)
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 12)
         .frame(width: state.expandedSize.width, height: state.expandedSize.height)
     }
 
