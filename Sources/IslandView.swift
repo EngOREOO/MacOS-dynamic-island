@@ -150,16 +150,12 @@ struct IslandView: View {
         .frame(height: state.idleSize.height)
     }
 
-    // MARK: compact pill — artwork + title + waveform (iPhone style)
+    // MARK: compact pill — artwork left + waveform right (Alcove style)
 
     private var compactContent: some View {
-        HStack(spacing: 8) {
+        HStack {
             artworkView(size: 22)
-            Text(state.track?.title ?? "")
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .font(.system(size: 11, weight: .medium))
-            Spacer(minLength: 4)
+            Spacer()
             WaveformView(active: state.track?.isPlaying ?? false)
         }
         .foregroundColor(.white.opacity(0.9))
