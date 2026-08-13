@@ -20,10 +20,13 @@ controls and a seekable progress bar.
   with color-coded icons:
   - 🔌 **Charger connected** (green) / **removed** (orange), instantly — the app
     listens for IOKit power-source events, so the pop fires the moment you
-    plug or unplug, no polling delay
+    plug or unplug, no polling delay. Includes time-to-full / time-left
+    estimates when macOS provides them
   - 🪫 **Low battery** warning at 20% (red)
   - 🔒 **Screen locked** / **unlocked** (blue)
-  Multiple events queue up and show one at a time, ~4s each
+  - 🔊 **Volume HUD** — the instant you press a volume key: speaker icon,
+    percentage, and a level bar (native CoreAudio listener, no polling)
+  Multiple events queue up and show one at a time, ~4s each (HUDs ~2s)
 - **Hover to expand** — full card with artwork, title, artist, source-app badge,
   previous / play-pause / next, and a **seek bar you can drag** to scrub
   through the song or video
@@ -74,6 +77,8 @@ macOS will ask once for each of these — approve them:
 | Track changes | Island pops open for 1s with "Now Playing", then collapses |
 | Hover the island | Full controls: prev / play / next, seek slider, source badge |
 | Drag the seek bar | Scrubs the playing song/video |
+| Swipe left / right across the island | Next / previous track |
+| Press a volume key | Volume HUD pops with level bar |
 | Click the gear icon | Opens Settings — adjust position and every island size live |
 | Click the power icon | Quits the app |
 
