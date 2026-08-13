@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - Settings
 
@@ -35,9 +36,29 @@ struct SettingsView: View {
                 Spacer()
                 Button("Reset to defaults") { state.resetGeometry() }
             }
+            Divider()
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Author — Ahmed Hany (EngOREOO)").font(.headline)
+                HStack(spacing: 14) {
+                    accountLink("GitHub", "https://github.com/EngOREOO")
+                    accountLink("LinkedIn", "https://www.linkedin.com/in/codebyoreoo/")
+                    accountLink("Facebook", "https://web.facebook.com/hanyohnana")
+                    accountLink("Email", "mailto:ahmed.hany.off@gmail.com")
+                }
+                .font(.system(size: 12))
+            }
         }
         .padding(20)
         .frame(width: 360)
+    }
+
+    private func accountLink(_ label: String, _ url: String) -> some View {
+        Button {
+            if let u = URL(string: url) { NSWorkspace.shared.open(u) }
+        } label: {
+            Text(label)
+        }
+        .buttonStyle(.link)
     }
 
     private func slider(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String) -> some View {
