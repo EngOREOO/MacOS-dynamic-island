@@ -58,7 +58,8 @@ struct IslandView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.top, 13)
+        .offset(x: state.xOffset)
+        .padding(.top, state.topOffset)
         .onAppear { state.start() }
         .animation(.spring(response: 0.38, dampingFraction: 0.78), value: state.mode)
     }
@@ -185,6 +186,12 @@ struct IslandView: View {
                 Text(state.battery)
                     .font(.system(size: 11))
                 Spacer()
+                Button { state.openSettings() } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
                 Button { NSApp.terminate(nil) } label: {
                     Image(systemName: "power")
                         .font(.system(size: 10))
