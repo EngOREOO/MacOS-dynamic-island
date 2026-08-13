@@ -151,22 +151,22 @@ final class IslandState: ObservableObject {
 
     private func checkPowerSource() {
         guard let info = powerSource() else { battery = ""; return }
-        battery = "\(info.capacity)%\(info.charging ? " ⚡" : "")"
+        battery = "\(info.capacity)%\(info.pluggedIn ? " ⚡" : "")"
 
-        if let last = lastCharging, last != info.charging {
+        if let last = lastCharging, last != info.pluggedIn {
             notify(
-                icon: info.charging ? "bolt.fill" : "bolt.slash.fill",
-                title: info.charging ? "Charger Connected" : "Charger Removed",
+                icon: info.pluggedIn ? "bolt.fill" : "bolt.slash.fill",
+                title: info.pluggedIn ? "Charger Connected" : "Charger Removed",
                 subtitle: "Battery \(info.capacity)%"
             )
         }
-        lastCharging = info.charging
+        lastCharging = info.pluggedIn
 
-        if info.capacity <= 20 && !info.charging && !lowBatteryWarned {
+        if info.capacity <= 20 && !info.pluggedIn && !lowBatteryWarned {
             lowBatteryWarned = true
             notify(icon: "battery.25", title: "Low Battery", subtitle: "\(info.capacity)% remaining")
         }
-        if info.capacity > 25 || info.charging { lowBatteryWarned = false }
+        if info.capacity > 25 || info.pluggedIn { lowBatteryWarned = false }
     }
 
     private func updateMode() {
@@ -216,13 +216,15 @@ final class IslandState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.refresh() }
     }
 
-    private func powerSource() -> (capacity: Int, charging: Bool)? {
+    private func powerSource() -> (capacity: Int, pluggedIn: Bool)? {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
               let source = sources.first,
               let desc = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
               let capacity = desc[kIOPSCurrentCapacityKey] as? Int else { return nil }
-        let charging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
-        return (capacity, charging)
+        // NB: IsCharging is false when the battery is full even on AC —
+        // the power-source Type is the reliable "is the charger attached" signal.
+        let pluggedIn = (desc[kIOPSTypeKey] as? String) == kIOPSACPowerValue
+        return (capacity, pluggedIn)
     }
 }
