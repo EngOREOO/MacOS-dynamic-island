@@ -8,7 +8,14 @@ enum IslandMode: Equatable {
     case idle          // slim pill: clock
     case compact       // pill with artwork + waveform
     case expanded      // hover: full controls
-    case notification  // transient pop (track change)
+    case notification  // transient pop (track change / system event)
+}
+
+struct IslandNotification {
+    var icon: String        // SF Symbol name
+    var title: String
+    var subtitle: String
+    var isTrack = false     // track pops render artwork + waveform instead of the icon
 }
 
 final class IslandState: ObservableObject {
@@ -75,6 +82,44 @@ final class IslandState: ObservableObject {
     private var started = false
     private var notificationWorkItem: DispatchWorkItem?
 
+    // MARK: notification hub
+
+    @Published var activeNotification: IslandNotification?
+    private var notifQueue: [IslandNotification] = []
+    private var lastCharging: Bool?
+    private var lowBatteryWarned = false
+
+    /// Enqueue a pop. Pops show one at a time for ~4s each, in order.
+    func notify(icon: String, title: String, subtitle: String, isTrack: Bool = false) {
+        notifQueue.append(IslandNotification(icon: icon, title: title, subtitle: subtitle, isTrack: isTrack))
+        drainQueue()
+    }
+
+    private func drainQueue() {
+        guard activeNotification == nil, !notifQueue.isEmpty else { return }
+        activeNotification = notifQueue.removeFirst()
+        mode = .notification
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.activeNotification = nil
+            self.notificationWorkItem = nil
+            self.updateMode()
+            self.drainQueue()
+        }
+        notificationWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: work)
+    }
+
+    private func startEventSources() {
+        let dnc = DistributedNotificationCenter.default()
+        dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.notify(icon: "lock.fill", title: "Screen Locked", subtitle: "See you soon")
+        }
+        dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            self?.notify(icon: "lock.open.fill", title: "Welcome Back", subtitle: "Screen unlocked")
+        }
+    }
+
     func start() {
         guard !started else { return }
         started = true
@@ -82,6 +127,7 @@ final class IslandState: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+        startEventSources()
     }
 
     func setHovering(_ h: Bool) {
@@ -91,33 +137,41 @@ final class IslandState: ObservableObject {
 
     private func refresh(initial: Bool = false) {
         time = Date()
-        battery = batteryInfo()
+        checkPowerSource()
         MediaController.fetchTrack { [weak self] newTrack in
             guard let self else { return }
             let trackChanged = newTrack?.title != self.track?.title || newTrack?.artist != self.track?.artist
             self.track = newTrack
-            if trackChanged, newTrack != nil, !initial {
-                self.showNotification()
+            if trackChanged, let t = newTrack, !initial {
+                self.notify(icon: "music.note", title: t.title, subtitle: t.artist, isTrack: true)
             }
             self.updateMode()
         }
     }
 
-    private func showNotification() {
-        notificationWorkItem?.cancel()
-        mode = .notification
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.notificationWorkItem = nil
-            self.updateMode()
+    private func checkPowerSource() {
+        guard let info = powerSource() else { battery = ""; return }
+        battery = "\(info.capacity)%\(info.charging ? " ⚡" : "")"
+
+        if let last = lastCharging, last != info.charging {
+            notify(
+                icon: info.charging ? "bolt.fill" : "bolt.slash.fill",
+                title: info.charging ? "Charger Connected" : "Charger Removed",
+                subtitle: "Battery \(info.capacity)%"
+            )
         }
-        notificationWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: work)
+        lastCharging = info.charging
+
+        if info.capacity <= 20 && !info.charging && !lowBatteryWarned {
+            lowBatteryWarned = true
+            notify(icon: "battery.25", title: "Low Battery", subtitle: "\(info.capacity)% remaining")
+        }
+        if info.capacity > 25 || info.charging { lowBatteryWarned = false }
     }
 
     private func updateMode() {
-        if case .notification = mode, notificationWorkItem != nil {
-            return // stay until the work item fires
+        if activeNotification != nil {
+            return // stay in notification mode until the pop dismisses
         }
         if hovering {
             mode = .expanded
@@ -162,13 +216,13 @@ final class IslandState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.refresh() }
     }
 
-    private func batteryInfo() -> String {
+    private func powerSource() -> (capacity: Int, charging: Bool)? {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
               let source = sources.first,
               let desc = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
-              let capacity = desc[kIOPSCurrentCapacityKey] as? Int else { return "" }
+              let capacity = desc[kIOPSCurrentCapacityKey] as? Int else { return nil }
         let charging = (desc[kIOPSIsChargingKey] as? Bool) ?? false
-        return "\(capacity)%\(charging ? " ⚡" : "")"
+        return (capacity, charging)
     }
 }
