@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import IOKit.ps
+import CoreAudio
 
 // MARK: - State
 
@@ -18,6 +19,7 @@ struct IslandNotification {
     var isTrack = false     // track pops render artwork + waveform instead of the icon
     var duration: Double = 4.0
     var accent: Color = .white
+    var level: Double? = nil // 0…1 → renders a HUD bar (volume / brightness)
 }
 
 final class IslandState: ObservableObject {
@@ -94,9 +96,10 @@ final class IslandState: ObservableObject {
 
     /// Enqueue a pop. Pops show one at a time, in order.
     func notify(icon: String, title: String, subtitle: String, isTrack: Bool = false,
-                duration: Double = 4.0, accent: Color = .white) {
+                duration: Double = 4.0, accent: Color = .white, level: Double? = nil) {
         notifQueue.append(IslandNotification(icon: icon, title: title, subtitle: subtitle,
-                                             isTrack: isTrack, duration: duration, accent: accent))
+                                             isTrack: isTrack, duration: duration, accent: accent,
+                                             level: level))
         drainQueue()
     }
 
@@ -135,6 +138,70 @@ final class IslandState: ObservableObject {
         if let source = IOPSNotificationCreateRunLoopSource(callback, context)?.takeRetainedValue() {
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
         }
+        startVolumeListener()
+    }
+
+    // MARK: volume / brightness HUDs
+
+    private var lastVolume: Float?
+    private var volumeDeviceID: AudioDeviceID = 0
+
+    /// CoreAudio property listener on the default output device → the pop
+    /// fires the same instant the volume key is pressed (like Alcove's HUDs).
+    private func startVolumeListener() {
+        registerVolumeListener()
+        // follow default-device changes (speakers ⇄ AirPods ⇄ monitors…)
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, .main) { [weak self] _, _ in
+            self?.lastVolume = nil
+            self?.registerVolumeListener()
+        }
+        lastVolume = currentVolume()
+    }
+
+    private func registerVolumeListener() {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &device) == noErr,
+              device != kAudioObjectUnknown else { return }
+        volumeDeviceID = device
+        var volAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectHasProperty(device, &volAddr) else { return }
+        AudioObjectAddPropertyListenerBlock(device, &volAddr, .main) { [weak self] _, _ in
+            self?.volumeChanged()
+        }
+    }
+
+    private func currentVolume() -> Float? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain)
+        var v = Float(0)
+        var size = UInt32(MemoryLayout<Float>.size)
+        guard volumeDeviceID != 0,
+              AudioObjectGetPropertyData(volumeDeviceID, &addr, 0, nil, &size, &v) == noErr else { return nil }
+        return v
+    }
+
+    private func volumeChanged() {
+        guard let v = currentVolume() else { return }
+        defer { lastVolume = v }
+        guard let last = lastVolume, abs(v - last) > 0.005 else { return }
+        let pct = Int((v * 100).rounded())
+        notify(icon: v == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill",
+               title: "Volume", subtitle: "\(pct)%",
+               duration: 2.0, level: Double(v))
     }
 
     func start() {
@@ -173,10 +240,16 @@ final class IslandState: ObservableObject {
         charging = info.pluggedIn
 
         if let last = lastPlugged, last != info.pluggedIn {
+            var subtitle = "Battery \(info.capacity)%"
+            if info.pluggedIn, info.minsToFull > 0 {
+                subtitle += " · \(Self.formatMinutes(info.minsToFull)) to full"
+            } else if !info.pluggedIn, info.minsToEmpty > 0 {
+                subtitle += " · \(Self.formatMinutes(info.minsToEmpty)) left"
+            }
             notify(
                 icon: info.pluggedIn ? "bolt.fill" : "bolt.slash.fill",
                 title: info.pluggedIn ? "Charger Connected" : "Charger Removed",
-                subtitle: "Battery \(info.capacity)%",
+                subtitle: subtitle,
                 accent: info.pluggedIn ? .green : .orange
             )
         }
@@ -236,7 +309,11 @@ final class IslandState: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.refresh() }
     }
 
-    private func powerSource() -> (capacity: Int, pluggedIn: Bool)? {
+    private static func formatMinutes(_ mins: Int) -> String {
+        mins >= 60 ? "\(mins / 60)h \(mins % 60)m" : "\(mins)m"
+    }
+
+    private func powerSource() -> (capacity: Int, pluggedIn: Bool, minsToFull: Int, minsToEmpty: Int)? {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
               let source = sources.first,
@@ -245,6 +322,8 @@ final class IslandState: ObservableObject {
         // NB: on a MacBook the listed source IS the battery, so its Type is
         // "InternalBattery" — the charger-attach signal lives in Power Source State.
         let pluggedIn = (desc[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
-        return (capacity, pluggedIn)
+        return (capacity, pluggedIn,
+                desc[kIOPSTimeToFullChargeKey] as? Int ?? 0,
+                desc[kIOPSTimeToEmptyKey] as? Int ?? 0)
     }
 }
