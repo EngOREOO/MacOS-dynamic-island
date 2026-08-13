@@ -16,12 +16,15 @@ struct IslandNotification {
     var title: String
     var subtitle: String
     var isTrack = false     // track pops render artwork + waveform instead of the icon
+    var duration: Double = 4.0
+    var accent: Color = .white
 }
 
 final class IslandState: ObservableObject {
     @Published var mode: IslandMode = .idle
     @Published var track: Track?
     @Published var battery: String = ""
+    @Published var charging = false
     @Published var time: Date = Date()
     @Published var hovering = false
 
@@ -86,18 +89,21 @@ final class IslandState: ObservableObject {
 
     @Published var activeNotification: IslandNotification?
     private var notifQueue: [IslandNotification] = []
-    private var lastCharging: Bool?
+    private var lastPlugged: Bool?
     private var lowBatteryWarned = false
 
-    /// Enqueue a pop. Pops show one at a time for ~4s each, in order.
-    func notify(icon: String, title: String, subtitle: String, isTrack: Bool = false) {
-        notifQueue.append(IslandNotification(icon: icon, title: title, subtitle: subtitle, isTrack: isTrack))
+    /// Enqueue a pop. Pops show one at a time, in order.
+    func notify(icon: String, title: String, subtitle: String, isTrack: Bool = false,
+                duration: Double = 4.0, accent: Color = .white) {
+        notifQueue.append(IslandNotification(icon: icon, title: title, subtitle: subtitle,
+                                             isTrack: isTrack, duration: duration, accent: accent))
         drainQueue()
     }
 
     private func drainQueue() {
         guard activeNotification == nil, !notifQueue.isEmpty else { return }
-        activeNotification = notifQueue.removeFirst()
+        let next = notifQueue.removeFirst()
+        activeNotification = next
         mode = .notification
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -107,16 +113,27 @@ final class IslandState: ObservableObject {
             self.drainQueue()
         }
         notificationWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + next.duration, execute: work)
     }
 
     private func startEventSources() {
         let dnc = DistributedNotificationCenter.default()
         dnc.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            self?.notify(icon: "lock.fill", title: "Screen Locked", subtitle: "See you soon")
+            self?.notify(icon: "lock.fill", title: "Screen Locked", subtitle: "See you soon", accent: .blue)
         }
         dnc.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            self?.notify(icon: "lock.open.fill", title: "Welcome Back", subtitle: "Screen unlocked")
+            self?.notify(icon: "lock.open.fill", title: "Welcome Back", subtitle: "Screen unlocked", accent: .blue)
+        }
+        // Fires the instant any power source changes (charger in/out, capacity…)
+        // — no waiting for the 2s poll, so plug/unplug pops feel immediate.
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        let callback: IOPowerSourceCallbackType = { context in
+            guard let context else { return }
+            let state = Unmanaged<IslandState>.fromOpaque(context).takeUnretainedValue()
+            DispatchQueue.main.async { state.checkPowerSource() }
+        }
+        if let source = IOPSNotificationCreateRunLoopSource(callback, context)?.takeRetainedValue() {
+            CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
         }
     }
 
@@ -143,7 +160,8 @@ final class IslandState: ObservableObject {
             let trackChanged = newTrack?.title != self.track?.title || newTrack?.artist != self.track?.artist
             self.track = newTrack
             if trackChanged, let t = newTrack, !initial {
-                self.notify(icon: "music.note", title: t.title, subtitle: t.artist, isTrack: true)
+                // quick glance — pop for a beat, then tuck away
+                self.notify(icon: "music.note", title: t.title, subtitle: t.artist, isTrack: true, duration: 1.0)
             }
             self.updateMode()
         }
@@ -151,20 +169,22 @@ final class IslandState: ObservableObject {
 
     private func checkPowerSource() {
         guard let info = powerSource() else { battery = ""; return }
-        battery = "\(info.capacity)%\(info.pluggedIn ? " ⚡" : "")"
+        battery = "\(info.capacity)%"
+        charging = info.pluggedIn
 
-        if let last = lastCharging, last != info.pluggedIn {
+        if let last = lastPlugged, last != info.pluggedIn {
             notify(
                 icon: info.pluggedIn ? "bolt.fill" : "bolt.slash.fill",
                 title: info.pluggedIn ? "Charger Connected" : "Charger Removed",
-                subtitle: "Battery \(info.capacity)%"
+                subtitle: "Battery \(info.capacity)%",
+                accent: info.pluggedIn ? .green : .orange
             )
         }
-        lastCharging = info.pluggedIn
+        lastPlugged = info.pluggedIn
 
         if info.capacity <= 20 && !info.pluggedIn && !lowBatteryWarned {
             lowBatteryWarned = true
-            notify(icon: "battery.25", title: "Low Battery", subtitle: "\(info.capacity)% remaining")
+            notify(icon: "battery.25", title: "Low Battery", subtitle: "\(info.capacity)% remaining", accent: .red)
         }
         if info.capacity > 25 || info.pluggedIn { lowBatteryWarned = false }
     }
@@ -222,9 +242,9 @@ final class IslandState: ObservableObject {
               let source = sources.first,
               let desc = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any],
               let capacity = desc[kIOPSCurrentCapacityKey] as? Int else { return nil }
-        // NB: IsCharging is false when the battery is full even on AC —
-        // the power-source Type is the reliable "is the charger attached" signal.
-        let pluggedIn = (desc[kIOPSTypeKey] as? String) == kIOPSACPowerValue
+        // NB: on a MacBook the listed source IS the battery, so its Type is
+        // "InternalBattery" — the charger-attach signal lives in Power Source State.
+        let pluggedIn = (desc[kIOPSPowerSourceStateKey] as? String) == kIOPSACPowerValue
         return (capacity, pluggedIn)
     }
 }
