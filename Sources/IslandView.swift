@@ -28,6 +28,24 @@ struct WaveformView: View {
     }
 }
 
+// MARK: - Battery label — percent + green bolt while charging
+
+struct BatteryLabel: View {
+    @ObservedObject var state: IslandState
+    var size: CGFloat = 11
+
+    var body: some View {
+        HStack(spacing: 3) {
+            if state.charging {
+                Image(systemName: "bolt.fill")
+                    .foregroundColor(.green)
+            }
+            Text(state.battery)
+        }
+        .font(.system(size: size, weight: .medium))
+    }
+}
+
 // MARK: - Island View
 
 struct IslandView: View {
@@ -42,6 +60,8 @@ struct IslandView: View {
         }
     }
 
+    private let morphSpring = Animation.spring(response: 0.42, dampingFraction: 0.72)
+
     var body: some View {
         ZStack(alignment: .top) {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -53,7 +73,7 @@ struct IslandView: View {
         .frame(width: currentSize.width, height: currentSize.height, alignment: .top)
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .onHover { inside in
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.78)) {
+            withAnimation(morphSpring) {
                 state.setHovering(inside)
             }
         }
@@ -61,7 +81,7 @@ struct IslandView: View {
         .offset(x: state.xOffset)
         .padding(.top, state.topOffset)
         .onAppear { state.start() }
-        .animation(.spring(response: 0.38, dampingFraction: 0.78), value: state.mode)
+        .animation(morphSpring, value: state.mode)
     }
 
     @ViewBuilder
@@ -85,7 +105,7 @@ struct IslandView: View {
             Circle().fill(Color.green).frame(width: 5, height: 5)
             Text(state.time, style: .time)
             Spacer()
-            Text(state.battery)
+            BatteryLabel(state: state)
         }
         .font(.system(size: 11, weight: .medium))
         .foregroundColor(.white.opacity(0.85))
@@ -124,11 +144,11 @@ struct IslandView: View {
                 HStack(spacing: 12) {
                     Image(systemName: n?.icon ?? "bell.fill")
                         .font(.system(size: 26))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(n?.accent ?? .white)
                         .frame(width: 48, height: 48)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.12))
+                                .fill((n?.accent ?? .white).opacity(0.15))
                         )
                     VStack(alignment: .leading, spacing: 3) {
                         Text(n?.title ?? "")
@@ -150,8 +170,7 @@ struct IslandView: View {
                 HStack {
                     Text(state.time, style: .time)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                    Text(state.battery)
-                        .font(.system(size: 11))
+                    BatteryLabel(state: state)
                     Spacer()
                 }
                 .foregroundColor(.white.opacity(0.7))
@@ -209,8 +228,7 @@ struct IslandView: View {
             HStack {
                 Text(state.time, style: .time)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                Text(state.battery)
-                    .font(.system(size: 11))
+                BatteryLabel(state: state)
                 Spacer()
                 Button { state.openSettings() } label: {
                     Image(systemName: "gearshape")
@@ -241,6 +259,7 @@ struct IslandView: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+                .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
         } else {
             RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
                 .fill(Color.white.opacity(0.12))
