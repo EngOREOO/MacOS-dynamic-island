@@ -40,7 +40,7 @@ final class IslandState: ObservableObject {
     var idleSize: CGSize { CGSize(width: idleW, height: idleH) }
     var compactSize: CGSize { CGSize(width: compactW, height: compactH) }
     var expandedSize: CGSize { CGSize(width: expandedW, height: expandedH) }
-    var notificationSize: CGSize { CGSize(width: min(expandedW, 340), height: 84) }
+    var notificationSize: CGSize { expandedSize } // events pop as the full card
 
     var currentSize: CGSize {
         switch mode {

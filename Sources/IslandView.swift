@@ -110,44 +110,55 @@ struct IslandView: View {
         .frame(height: state.compactSize.height)
     }
 
-    // MARK: notification pop — track change or system event
+    // MARK: notification card — auto-shows on events, styled like the hover card
 
+    @ViewBuilder
     private var notificationContent: some View {
         let n = state.activeNotification
-        let isTrack = n?.isTrack ?? true
-        return HStack(spacing: 12) {
-            if isTrack {
-                artworkView(size: 52)
-            } else {
-                Image(systemName: n?.icon ?? "bell.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white.opacity(0.9))
-                    .frame(width: 52, height: 52)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(0.12))
-                    )
+        if n?.isTrack ?? true {
+            // track change: full media card, same as hover
+            expandedContent
+        } else {
+            // system event card (charger, battery, lock…)
+            VStack(spacing: 9) {
+                HStack(spacing: 12) {
+                    Image(systemName: n?.icon ?? "bell.fill")
+                        .font(.system(size: 26))
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 48, height: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.12))
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(n?.title ?? "")
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                        Text(n?.subtitle ?? "")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                        Text("Notification")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.white.opacity(0.12)))
+                    }
+                    Spacer()
+                }
+                Spacer()
+                HStack {
+                    Text(state.time, style: .time)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                    Text(state.battery)
+                        .font(.system(size: 11))
+                    Spacer()
+                }
+                .foregroundColor(.white.opacity(0.7))
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(isTrack ? "Now Playing" : "Notification")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-                Text(n?.title ?? state.track?.title ?? "")
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                Text(n?.subtitle ?? state.track?.artist ?? "")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if isTrack {
-                WaveformView(active: state.track?.isPlaying ?? false)
-            }
+            .padding(14)
+            .frame(width: state.expandedSize.width, height: state.expandedSize.height, alignment: .top)
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .frame(height: state.notificationSize.height)
     }
 
     // MARK: expanded — full media controls
