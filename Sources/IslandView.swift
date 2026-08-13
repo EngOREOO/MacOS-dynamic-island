@@ -77,6 +77,15 @@ struct IslandView: View {
                 state.setHovering(inside)
             }
         }
+        // swipe across the island to skip tracks (left = next, right = previous)
+        .gesture(
+            DragGesture(minimumDistance: 25)
+                .onEnded { value in
+                    let dx = value.translation.width
+                    guard abs(dx) > abs(value.translation.height), abs(dx) > 40 else { return }
+                    if dx < 0 { state.next() } else { state.prev() }
+                }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .offset(x: state.xOffset)
         .padding(.top, state.topOffset)
@@ -158,11 +167,25 @@ struct IslandView: View {
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
-                        Text("Notification")
-                            .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.white.opacity(0.12)))
+                        if let level = n?.level {
+                            // HUD bar (volume / brightness) — Alcove style
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Color.white.opacity(0.15))
+                                    Capsule()
+                                        .fill(n?.accent ?? .white)
+                                        .frame(width: max(6, geo.size.width * CGFloat(level)))
+                                }
+                            }
+                            .frame(height: 5)
+                            .padding(.top, 2)
+                        } else {
+                            Text("Notification")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.white.opacity(0.12)))
+                        }
                     }
                     Spacer()
                 }
