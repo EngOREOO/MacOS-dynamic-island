@@ -15,8 +15,8 @@ with full media controls and a seekable progress bar.
 - **Notch-flush design** — square top corners melt into the notch/menu bar,
   rounded bottom corners; the island looks like part of the hardware
 - **Idle pill** — clock + battery, sits quietly at the top of the screen
-- **Now Playing pill** — artwork, track title, and a live animated waveform
-  while anything plays (freezes on pause)
+- **Now Playing pill** — artwork on the left, live animated waveform on the
+  right (Alcove style), while anything plays (freezes on pause)
 - **Track-change pop** — the island pops open for a 1-second glance when a new
   track starts, then tucks itself away (iPhone-style)
 - **Notification hub** — queued pop-ups for system events, rendered iPhone-style
@@ -33,7 +33,8 @@ with full media controls and a seekable progress bar.
   Multiple events queue up and show one at a time, ~4s each (HUDs ~2s)
 - **Hover to expand** — Alcove-style player card: artwork, title + artist,
   live waveform, elapsed / **-remaining** times, a **seek bar you can drag**,
-  and transport controls with settings + quit tucked into the corners
+  and transport controls with settings + quit tucked into the corners.
+  With nothing playing the card shrinks to hug its content — no dead space
 - **Works with everything** — YouTube in Brave/Chrome/Safari/Arc/Edge/Firefox,
   Apple Music, Spotify, QuickTime… anything macOS Now Playing sees
 - **YouTube thumbnails** — browser playback doesn't ship artwork to macOS, so the
